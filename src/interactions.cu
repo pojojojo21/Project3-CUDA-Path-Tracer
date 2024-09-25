@@ -47,7 +47,51 @@ __host__ __device__ void scatterRay(
     const Material &m,
     thrust::default_random_engine &rng)
 {
-    // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    
+    // Scatter ray according to the material's properties
+    if (m.hasReflective == 1.0f) {
+        // A basic implementation of pure-diffuse (Lambertian) shading
+        glm::vec3 newRayDirection = glm::reflect(pathSegment.ray.direction, normal);
+
+        // Update the path segment with new ray data
+        pathSegment.ray.origin = intersect + normal * 0.001f;  // Small offset to prevent self-intersection
+        pathSegment.ray.direction = glm::normalize(newRayDirection);
+
+        // Multiply the color of the path segment by the material's diffuse color
+        pathSegment.color *= m.color;
+
+        // Decrease the remaining bounces for this path segment
+        pathSegment.remainingBounces--;
+
+        // check if remainingBounces is 0
+        if (pathSegment.remainingBounces == 0)
+        {
+            pathSegment.color *= 0.0f;
+        }
+    }
+    else if (m.hasRefractive == 1.0f) {
+        // Implement refractive material logic if needed in the future.
+    }
+    else {
+        // A basic implementation of pure-diffuse (Lambertian) shading
+        glm::vec3 newRayDirection = calculateRandomDirectionInHemisphere(normal, rng);
+
+        // Update the path segment with new ray data
+        pathSegment.ray.origin = intersect + normal * 0.001f;  // Small offset to prevent self-intersection
+        pathSegment.ray.direction = glm::normalize(newRayDirection);
+
+        // Multiply the color of the path segment by the material's diffuse color
+        pathSegment.color *= m.color;
+
+        // Decrease the remaining bounces for this path segment
+        pathSegment.remainingBounces--;
+
+        // check if remainingBounces is 0
+        if (pathSegment.remainingBounces == 0)
+        {
+            pathSegment.color *= 0.0f;
+        }
+    }
 }
