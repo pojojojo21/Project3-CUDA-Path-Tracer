@@ -81,6 +81,7 @@ static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
+static Vertex* dev_vertices = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 
@@ -110,6 +111,9 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
     cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
+    cudaMalloc(&dev_vertices, scene->vertices.size() * sizeof(Vertex));
+    cudaMemcpy(dev_vertices, scene->vertices.data(), scene->vertices.size() * sizeof(Vertex), cudaMemcpyHostToDevice);
+
     // TODO: initialize any extra device memeory you need
 
     checkCUDAError("pathtraceInit");
@@ -122,6 +126,7 @@ void pathtraceFree()
     cudaFree(dev_geoms);
     cudaFree(dev_materials);
     cudaFree(dev_intersections);
+    cudaFree(dev_vertices);
     // TODO: clean up any extra device memory you created
 
     checkCUDAError("pathtraceFree");
@@ -161,7 +166,57 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
     }
 }
 
-// TODO:
+// Möller–Trumbore intersection
+__host__ __device__ float triangleIntersect(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2,
+    glm::vec3 rayOrigin, glm::vec3 rayDirection) {
+    glm::vec3 edge1, edge2, h, s, q;
+    float a, f, u, v;
+    edge1 = p1 - p0;
+    edge2 = p2 - p0;
+    h = glm::cross(rayDirection, edge2);
+    a = glm::dot(edge1, h);
+    if (a > -EPSILON && a < EPSILON) {
+        return INFINITY;    // This ray is parallel to this triangle.
+    }
+    f = 1.0 / a;
+    s = rayOrigin - p0;
+    u = f * glm::dot(s, h);
+    if (u < 0.0 || u > 1.0)
+        return INFINITY;
+    q = glm::cross(s, edge1);
+    v = f * glm::dot(rayDirection, q);
+    if (v < 0.0 || u + v > 1.0) {
+        return INFINITY;
+    }
+    // At this stage we can compute t to find out where the intersection point is on the line.
+    float t = f * glm::dot(edge2, q);
+    if (t > EPSILON) {
+        return t;
+    }
+    else // This means that there is a line intersection but not a ray intersection.
+        return INFINITY;
+}
+
+__host__ __device__ glm::vec3 barycentric(glm::vec3 p, glm::vec3 t1, glm::vec3 t2, glm::vec3 t3) {
+    glm::vec3 edge1 = t2 - t1;
+    glm::vec3 edge2 = t3 - t2;
+    float S = length(cross(edge1, edge2));
+
+    edge1 = p - t2;
+    edge2 = p - t3;
+    float S1 = length(cross(edge1, edge2));
+
+    edge1 = p - t1;
+    edge2 = p - t3;
+    float S2 = length(cross(edge1, edge2));
+
+    edge1 = p - t1;
+    edge2 = p - t2;
+    float S3 = length(cross(edge1, edge2));
+
+    return glm::vec3(S1 / S, S2 / S, S3 / S);
+}
+
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
 // Feel free to modify the code below.
@@ -171,7 +226,9 @@ __global__ void computeIntersections(
     PathSegment* pathSegments,
     Geom* geoms,
     int geoms_size,
-    ShadeableIntersection* intersections)
+    ShadeableIntersection* intersections,
+    Vertex* vertices,
+    int vert_size)
 {
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -183,7 +240,7 @@ __global__ void computeIntersections(
         glm::vec3 intersect_point;
         glm::vec3 normal;
         float t_min = FLT_MAX;
-        int hit_geom_index = -1;
+        int mat_index = -1;
         bool outside = true;
 
         glm::vec3 tmp_intersect;
@@ -210,13 +267,30 @@ __global__ void computeIntersections(
             if (t > 0.0f && t_min > t)
             {
                 t_min = t;
-                hit_geom_index = i;
-                intersect_point = tmp_intersect;
+                mat_index = geoms[i].materialid;
                 normal = tmp_normal;
             }
         }
 
-        if (hit_geom_index == -1)
+        // check if intersects with model
+        for (int vertIdx = 0; vertIdx < vert_size; vertIdx += 3)
+        {
+            Vertex& v1 = vertices[vertIdx];
+            Vertex& v2 = vertices[vertIdx + 1];
+            Vertex& v3 = vertices[vertIdx + 2];
+            t = triangleIntersect(v1.pos, v2.pos, v3.pos, pathSegment.ray.origin, pathSegment.ray.direction);
+
+            if (t > 0.0f && t_min > t)
+            {
+                t_min = t;
+                mat_index = v1.materialid;
+                glm::vec3 p = pathSegment.ray.origin + (pathSegment.ray.direction * t);
+                glm::vec3 bary = barycentric(p, v1.pos, v2.pos, v3.pos); // Calculate barycentric coordinates
+                normal = glm::normalize(bary.x * v1.nor + bary.y * v2.nor + bary.z * v3.nor); // Interpolate normals
+            }
+        }
+
+        if (mat_index == -1)
         {
             intersections[path_index].t = -1.0f;
         }
@@ -224,7 +298,7 @@ __global__ void computeIntersections(
         {
             // The ray hits something
             intersections[path_index].t = t_min;
-            intersections[path_index].materialId = geoms[hit_geom_index].materialid;
+            intersections[path_index].materialId = mat_index;
             intersections[path_index].surfaceNormal = normal;
         }
     }
@@ -372,7 +446,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_paths,
             dev_geoms,
             hst_scene->geoms.size(),
-            dev_intersections
+            dev_intersections,
+            dev_vertices,
+            (int)hst_scene->vertices.size()
         );
         checkCUDAError("trace one bounce");
         cudaDeviceSynchronize();

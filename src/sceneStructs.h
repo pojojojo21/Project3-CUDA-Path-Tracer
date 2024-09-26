@@ -97,3 +97,9 @@ struct compareMatID {
         return a.materialId < b.materialId;
     }
 };
+
+struct Vertex {
+    int materialid;
+    glm::vec3 pos;
+    glm::vec3 nor;
+};
