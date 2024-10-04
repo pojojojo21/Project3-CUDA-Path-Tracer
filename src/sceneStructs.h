@@ -43,6 +43,8 @@ struct Material
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+    int diffuse_textureId;
+    int normal_textureId;
 };
 
 struct Camera
@@ -82,6 +84,8 @@ struct ShadeableIntersection
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  glm::vec2 surfaceUV;
+  glm::vec3 tangent;
 };
 
 struct isActive {
@@ -102,4 +106,12 @@ struct Vertex {
     int materialid;
     glm::vec3 pos;
     glm::vec3 nor;
+    glm::vec2 uv;
+    glm::vec3 tangent;
+};
+
+struct Texture {
+    int width;
+    int height;
+    int startIdx;
 };

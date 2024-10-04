@@ -82,6 +82,8 @@ static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 static Vertex* dev_vertices = NULL;
+static Texture* dev_textures = NULL;
+static glm::vec4* dev_pixels = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 
@@ -114,7 +116,12 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_vertices, scene->vertices.size() * sizeof(Vertex));
     cudaMemcpy(dev_vertices, scene->vertices.data(), scene->vertices.size() * sizeof(Vertex), cudaMemcpyHostToDevice);
 
-    // TODO: initialize any extra device memeory you need
+    cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+    cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+
+    cudaMalloc(&dev_pixels, scene->texturePixels.size() * sizeof(glm::vec4));
+    cudaMemcpy(dev_pixels, scene->texturePixels.data(), scene->texturePixels.size() * sizeof(glm::vec4), cudaMemcpyHostToDevice);
+
 
     checkCUDAError("pathtraceInit");
 }
@@ -127,7 +134,8 @@ void pathtraceFree()
     cudaFree(dev_materials);
     cudaFree(dev_intersections);
     cudaFree(dev_vertices);
-    // TODO: clean up any extra device memory you created
+    cudaFree(dev_textures);
+    cudaFree(dev_pixels);
 
     checkCUDAError("pathtraceFree");
 }
@@ -239,12 +247,14 @@ __global__ void computeIntersections(
         float t;
         glm::vec3 intersect_point;
         glm::vec3 normal;
+        glm::vec2 uv;
         float t_min = FLT_MAX;
         int mat_index = -1;
         bool outside = true;
 
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
+        glm::vec3 tmp_tangent;
 
         // naive parse through global geoms
 
@@ -287,6 +297,8 @@ __global__ void computeIntersections(
                 glm::vec3 p = pathSegment.ray.origin + (pathSegment.ray.direction * t);
                 glm::vec3 bary = barycentric(p, v1.pos, v2.pos, v3.pos); // Calculate barycentric coordinates
                 normal = glm::normalize(bary.x * v1.nor + bary.y * v2.nor + bary.z * v3.nor); // Interpolate normals
+                uv = bary.x * v1.uv + bary.y * v2.uv + bary.z * v3.uv; // Interpolate uv
+                tmp_tangent = bary.x * v1.tangent + bary.y * v2.tangent + bary.z * v3.tangent;
             }
         }
 
@@ -300,6 +312,8 @@ __global__ void computeIntersections(
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = mat_index;
             intersections[path_index].surfaceNormal = normal;
+            intersections[path_index].surfaceUV = uv;
+            intersections[path_index].tangent = tmp_tangent;
         }
     }
 }
@@ -318,7 +332,9 @@ __global__ void shadeFakeMaterial(
     int num_paths,
     ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
-    Material* materials)
+    Material* materials,
+    Texture* textures,
+    glm::vec4* pixels)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < num_paths)
@@ -337,6 +353,43 @@ __global__ void shadeFakeMaterial(
             Material material = materials[intersection.materialId];
             glm::vec3 materialColor = material.color;
 
+            // overwrite color if using material texture
+            if (material.diffuse_textureId != -1)
+            {
+                Texture t = textures[material.diffuse_textureId];
+                glm::vec2 uv = intersection.surfaceUV;
+                int x = (int)(glm::fract(uv.x) * (float)t.width);
+                int y = (int)(glm::fract(1.0 - uv.y) * (float)t.width);
+
+                int pixIdx = t.startIdx + y * t.width + x;
+
+                materialColor = glm::vec3(pixels[pixIdx]);
+            }
+
+            glm::vec3 normal = intersection.surfaceNormal;
+
+            // overwrite normal if using normal texture
+            /*if (material.normal_textureId != -1)
+            {
+                Texture t = textures[material.normal_textureId];
+                glm::vec2 uv = intersection.surfaceUV;
+                int x = (int)(glm::fract(uv.x) * (float)t.width);
+                int y = (int)(glm::fract(1.0 - uv.y) * (float)t.width);
+
+                int pixIdx = t.startIdx + y * t.width + x;
+
+                glm::vec3 pix_nor = glm::vec3(pixels[pixIdx]);
+
+                glm::vec3 tangent = intersection.tangent;
+                glm::vec3 bitangent = glm::cross(normal, tangent);
+
+                glm::mat3 mat{ tangent, bitangent, normal };
+
+                normal = mat * pix_nor;
+            }*/
+
+            material.color = materialColor;
+
             // If the material indicates that the object was a light, "light" the ray
             if (material.emittance > 0.0f) {
                 // Light source
@@ -347,7 +400,7 @@ __global__ void shadeFakeMaterial(
             // like what you would expect from shading in a rasterizer like OpenGL.
             else {
                 Ray ray = pathSegments[idx].ray;
-                scatterRay(pathSegments[idx], ray.origin + ray.direction * intersection.t, intersection.surfaceNormal, material, rng);
+                scatterRay(pathSegments[idx], ray.origin + ray.direction * intersection.t, normal, material, rng);
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -472,7 +525,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             num_paths,
             dev_intersections,
             dev_paths,
-            dev_materials
+            dev_materials,
+            dev_textures,
+            dev_pixels
         );
 
         PathSegment* new_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, isActive());

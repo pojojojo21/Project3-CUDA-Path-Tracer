@@ -7,6 +7,7 @@
 #include "scene.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
+#include "stb_image.h"
 
 using json = nlohmann::json;
 
@@ -33,12 +34,30 @@ void Scene::loadFromJSON(const std::string& jsonName)
     json data = json::parse(f);
     const auto& materialsData = data["Materials"];
     std::unordered_map<std::string, uint32_t> MatNameToID;
+    size_t lastSlashPos = jsonName.find_last_of('/');
+    std::string basePath = jsonName.substr(0, lastSlashPos);
     for (const auto& item : materialsData.items())
     {
         const auto& name = item.key();
         const auto& p = item.value();
         Material newMaterial{};
-        // TODO: handle materials loading differently
+        newMaterial.diffuse_textureId = -1;
+        newMaterial.normal_textureId = -1;
+        if (p.find("D_PATH") != p.end())
+        {
+            newMaterial.diffuse_textureId = textures.size();
+            std::string textureName = p["D_PATH"];
+            std::string texturePath = basePath + textureName;
+            loadFromTexture(texturePath);
+        }
+        if (p.find("N_PATH") != p.end())
+        {
+            newMaterial.normal_textureId = textures.size();
+            std::string textureName = p["N_PATH"];
+            std::string texturePath = basePath + textureName;
+            loadFromTexture(texturePath);
+        }
+
         if (p["TYPE"] == "Diffuse")
         {
             const auto& col = p["RGB"];
@@ -65,8 +84,6 @@ void Scene::loadFromJSON(const std::string& jsonName)
         const auto& type = p["TYPE"];
         if (type == "model")
         {
-            size_t lastSlashPos = jsonName.find_last_of('/');
-            std::string basePath = jsonName.substr(0, lastSlashPos);
             std::string objName = p["PATH"];
             std::string objPath = basePath + objName;
             int mat = MatNameToID[p["MATERIAL"]];
@@ -96,7 +113,6 @@ void Scene::loadFromJSON(const std::string& jsonName)
 
         geoms.push_back(newGeom);
     }
-    std::cout << vertices.size() << endl;
     const auto& cameraData = data["Camera"];
     Camera& camera = state.camera;
     RenderState& state = this->state;
@@ -161,6 +177,7 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID) {
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
 
+            std::vector<Vertex*> verts;
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++) {
 
@@ -191,22 +208,89 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID) {
                 }
 
                 //// Check if `texcoord_index` is zero or positive. negative = no texcoord data
-                //if (idx.texcoord_index >= 0) {
-                //    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-                //    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-                //}
+                if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+
+                    newVert.uv = glm::vec2(tx, ty);
+                }
+
                 // Optional: vertex colors
                 // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
                 // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
                 // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
                 // push_back new vertex to buffer
+                verts.push_back(&newVert); // add vert to temp list for tnagent calculation
                 this->vertices.push_back(newVert);
             }
+
+            //if (verts.size() > 3) std::cout << "Error: obj not triangulated" << std::endl;
+
+            //// Calculate tangents for the triangle
+            //glm::vec3 edge1 = verts[1]->pos - verts[0]->pos;
+            //glm::vec3 edge2 = verts[2]->pos - verts[0]->pos;
+
+            //glm::vec2 deltaUV1 = verts[1]->uv - verts[0]->uv;
+            //glm::vec2 deltaUV2 = verts[2]->uv - verts[0]->uv;
+
+            //float denom = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+            //if (denom == 0) continue;
+
+            //denom = 1.0f / denom;
+
+            //glm::vec3 tangent;
+            //tangent = denom * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
+
+            //// Assign tangent to th// correct the vertex tangent based on vertex normal
+            //verts[0]->tangent = tangent;
+            //verts[0]->tangent -= verts[0]->nor * glm::dot(
+            //    verts[0]->tangent, verts[0]->nor);
+            //verts[0]->tangent = glm::normalize(verts[0]->tangent);
+            //
+            //verts[1]->tangent = tangent;
+            //verts[1]->tangent -= verts[1]->nor * glm::dot(
+            //    verts[1]->tangent, verts[1]->nor);
+            //verts[1]->tangent = glm::normalize(verts[1]->tangent);
+
+            //verts[2]->tangent = tangent;
+            //verts[2]->tangent -= verts[2]->nor * glm::dot(
+            //    verts[2]->tangent, verts[2]->nor);
+            //verts[2]->tangent = glm::normalize(verts[2]->tangent);
+
             index_offset += fv;
 
             // per-face material
             //shapes[s].mesh.material_ids[f];
         }
     }
+}
+
+void Scene::loadFromTexture(const std::string& textureName) {
+    int width, height;
+    float* data = stbi_loadf(textureName.c_str(), &width, &height, NULL, 4);
+
+    if (!data) {
+        std::cerr << "Failed to load texture" << std::endl;
+        exit(1);
+    }
+
+    Texture newTexture;
+    newTexture.width = width;
+    newTexture.height = height;
+    newTexture.startIdx = (int)this->texturePixels.size();
+    this->textures.push_back(newTexture);
+    
+    for (int i = 0; i < width * height; i++)
+    {
+        glm::vec4 newPixel;
+        for (int j = 0; j < 4; j++)
+        {
+            newPixel[j] = data[i * 4 + j];
+        }
+        this->texturePixels.push_back(newPixel);
+    }
+
+    stbi_image_free(data);
 }

@@ -43,13 +43,14 @@
             "ROUGHNESS": 0.0
         },
         "model_color": {
-            "TYPE": "Specular",
+            "TYPE": "Diffuse",
             "RGB": [
                 0.5,
                 0.5,
                 0.98
             ],
-            "ROUGHNESS": 0.0
+            "D_PATH": "/Textures/ninja_d.png",
+            "N_PATH": "/Textures/ninja_n.png"
         }
     },
     "Camera": {
@@ -195,7 +196,7 @@
         {
             "TYPE": "model",
             "MATERIAL": "model_color",
-            "PATH": "/obj/cat2.obj",
+            "PATH": "/obj/ninja.obj",
             "TRANS": [
                 0.0,
                 0.0,
