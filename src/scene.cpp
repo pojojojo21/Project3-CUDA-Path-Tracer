@@ -82,23 +82,12 @@ void Scene::loadFromJSON(const std::string& jsonName)
     for (const auto& p : objectsData)
     {
         const auto& type = p["TYPE"];
-        if (type == "model")
-        {
-            std::string objName = p["PATH"];
-            std::string objPath = basePath + objName;
-            int mat = MatNameToID[p["MATERIAL"]];
-            loadFromOBJ(objPath, mat);
-            break;
-        }
         Geom newGeom;
-        if (type == "cube")
-        {
-            newGeom.type = CUBE;
-        }
-        else
-        {
-            newGeom.type = SPHERE;
-        }
+
+        if (type == "model") newGeom.type = MESH;
+        else if (type == "cube") newGeom.type = CUBE;
+        else newGeom.type = SPHERE;
+
         newGeom.materialid = MatNameToID[p["MATERIAL"]];
         const auto& trans = p["TRANS"];
         const auto& rotat = p["ROTAT"];
@@ -111,8 +100,17 @@ void Scene::loadFromJSON(const std::string& jsonName)
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
 
+        if (newGeom.type == MESH)
+        {
+            std::string objName = p["PATH"];
+            std::string objPath = basePath + objName;
+            loadFromOBJ(objPath, newGeom.materialid);
+            continue;
+        }
+
         geoms.push_back(newGeom);
     }
+
     const auto& cameraData = data["Camera"];
     Camera& camera = state.camera;
     RenderState& state = this->state;
@@ -177,7 +175,6 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID) {
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
 
-            std::vector<Vertex*> verts;
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++) {
 
@@ -221,49 +218,53 @@ void Scene::loadFromOBJ(const std::string& objName, int materialID) {
                 // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
                 // push_back new vertex to buffer
-                verts.push_back(&newVert); // add vert to temp list for tnagent calculation
                 this->vertices.push_back(newVert);
             }
-
-            //if (verts.size() > 3) std::cout << "Error: obj not triangulated" << std::endl;
-
-            //// Calculate tangents for the triangle
-            //glm::vec3 edge1 = verts[1]->pos - verts[0]->pos;
-            //glm::vec3 edge2 = verts[2]->pos - verts[0]->pos;
-
-            //glm::vec2 deltaUV1 = verts[1]->uv - verts[0]->uv;
-            //glm::vec2 deltaUV2 = verts[2]->uv - verts[0]->uv;
-
-            //float denom = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-            //if (denom == 0) continue;
-
-            //denom = 1.0f / denom;
-
-            //glm::vec3 tangent;
-            //tangent = denom * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
-
-            //// Assign tangent to th// correct the vertex tangent based on vertex normal
-            //verts[0]->tangent = tangent;
-            //verts[0]->tangent -= verts[0]->nor * glm::dot(
-            //    verts[0]->tangent, verts[0]->nor);
-            //verts[0]->tangent = glm::normalize(verts[0]->tangent);
-            //
-            //verts[1]->tangent = tangent;
-            //verts[1]->tangent -= verts[1]->nor * glm::dot(
-            //    verts[1]->tangent, verts[1]->nor);
-            //verts[1]->tangent = glm::normalize(verts[1]->tangent);
-
-            //verts[2]->tangent = tangent;
-            //verts[2]->tangent -= verts[2]->nor * glm::dot(
-            //    verts[2]->tangent, verts[2]->nor);
-            //verts[2]->tangent = glm::normalize(verts[2]->tangent);
 
             index_offset += fv;
 
             // per-face material
             //shapes[s].mesh.material_ids[f];
         }
+    }
+
+    for (int v_index = 0; v_index < this->vertices.size(); v_index += 3)
+    {
+        // Calculate tangents for the triangle
+        Vertex& v1 = vertices[v_index];
+        Vertex& v2 = vertices[v_index + 1];
+        Vertex& v3 = vertices[v_index + 2];
+
+        glm::vec3 edge1 = v2.pos - v1.pos;
+        glm::vec3 edge2 = v3.pos - v1.pos;
+
+        glm::vec2 deltaUV1 = v2.uv - v1.uv;
+        glm::vec2 deltaUV2 = v3.uv - v1.uv;
+
+        float denom = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        if (denom == 0) continue;
+
+        denom = 1.0f / denom;
+
+        glm::vec3 tangent;
+        tangent = denom * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
+
+        // correct the vertex tangent based on vertex normal
+        v1.tangent = tangent;
+        v1.tangent -= v1.nor * glm::dot(
+            v1.tangent, v1.nor);
+        v1.tangent = glm::normalize(v1.tangent);
+        
+        v2.tangent = tangent;
+        v2.tangent -= v2.nor * glm::dot(
+            v2.tangent, v2.nor);
+        v2.tangent = glm::normalize(v2.tangent);
+
+        v3.tangent = tangent;
+        v3.tangent -= v3.nor * glm::dot(
+            v3.tangent, v3.nor);
+        v3.tangent = glm::normalize(v3.tangent);
     }
 }
 

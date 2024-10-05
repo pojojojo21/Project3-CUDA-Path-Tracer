@@ -369,7 +369,7 @@ __global__ void shadeFakeMaterial(
             glm::vec3 normal = intersection.surfaceNormal;
 
             // overwrite normal if using normal texture
-            /*if (material.normal_textureId != -1)
+            if (material.normal_textureId != -1)
             {
                 Texture t = textures[material.normal_textureId];
                 glm::vec2 uv = intersection.surfaceUV;
@@ -386,7 +386,7 @@ __global__ void shadeFakeMaterial(
                 glm::mat3 mat{ tangent, bitangent, normal };
 
                 normal = mat * pix_nor;
-            }*/
+            }
 
             material.color = materialColor;
 
