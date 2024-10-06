@@ -57,7 +57,15 @@ void Scene::loadFromJSON(const std::string& jsonName)
             std::string texturePath = basePath + textureName;
             loadFromTexture(texturePath);
         }
+        if (p["TYPE"] == "Refractive")
+        {
+            const auto& col = p["RGB"];
+            newMaterial.color = glm::vec3(col[0], col[1], col[2]);
 
+            newMaterial.hasRefractive = 1.0f;
+
+            newMaterial.indexOfRefraction = p["IOR"];
+        }
         if (p["TYPE"] == "Diffuse")
         {
             const auto& col = p["RGB"];

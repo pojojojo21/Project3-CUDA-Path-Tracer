@@ -73,6 +73,48 @@ __host__ __device__ void scatterRay(
     }
     else if (m.hasRefractive == 1.0f) {
         // Implement refractive material logic if needed in the future.
+        glm::vec3 newRayDirection = glm::normalize(pathSegment.ray.direction);
+        glm::vec3 newRayNormal = glm::normalize(normal);
+
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        float randomNum = u01(rng);
+
+        // compute the Fresnel factor using the Schlick's approximation
+        const float cos = glm::dot(newRayNormal, newRayDirection);
+        const float n_1 = 1.0f;
+        const float n_2 = m.indexOfRefraction;
+        const float r_0 = glm::pow((n_1 - n_2) / (n_1 + n_2), 2.0f);
+        const float factor = r_0 + (1.0f - r_0) * glm::pow(1.0f + cos, 5.0f);
+
+        if (randomNum > factor)
+        {
+            // compute the refraction ratio based on the material's index of refraction
+            float ratio = 1.0f / m.indexOfRefraction;
+
+            // determine whether the ray exiting from the surface
+            if (cos >= 0.0f)
+            {
+                // update the normal
+                newRayNormal = -newRayNormal;
+                // update the refraction ratio
+                ratio = m.indexOfRefraction;
+            }
+
+            // compute the refracted ray direction
+            pathSegment.ray.direction = glm::refract(newRayDirection, newRayNormal, ratio);
+
+            // set the new ray's origin
+            pathSegment.ray.origin += pathSegment.ray.direction * 0.01f;
+        }
+        else
+        {
+            // reflect the ray's direction when the Fresnel factor is big
+            pathSegment.ray.direction = glm::reflect( pathSegment.ray.direction, newRayNormal);
+        }
+
+        // accumulate the output color
+        pathSegment.color *= m.color;
+
     }
     else {
         // A basic implementation of pure-diffuse (Lambertian) shading
