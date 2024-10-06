@@ -17,6 +17,8 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
+#define ANTIALIAS 1
+#define DOF 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -160,14 +162,36 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         segment.ray.origin = cam.position;
         segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-        // TODO: implement antialiasing by jittering the ray
         thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, pathSegments[index].remainingBounces);
-        thrust::uniform_real_distribution<float> u05(-0.5, 0.5);
+
+        float x_rng = 0.0f;
+        float y_rng = 0.0f;
+
+        if (ANTIALIAS)
+        {
+            // implement antialiasing by jittering the ray
+            thrust::uniform_real_distribution<float> u05(-0.5, 0.5);
+
+            x_rng = u05(rng);
+            y_rng = u05(rng);
+        }
 
         segment.ray.direction = glm::normalize(cam.view
-            - cam.right * cam.pixelLength.x * ((float)x + u05(rng) - (float)cam.resolution.x * 0.5f)
-            - cam.up * cam.pixelLength.y * ((float)y + u05(rng) - (float)cam.resolution.y * 0.5f)
+            - cam.right * cam.pixelLength.x * ((float)x + x_rng - (float)cam.resolution.x * 0.5f)
+            - cam.up * cam.pixelLength.y * ((float)y + y_rng - (float)cam.resolution.y * 0.5f)
         );
+        
+        if (DOF)
+        {
+            thrust::uniform_real_distribution<float> u01(0, 1);
+
+            float angle = u01(rng) * TWO_PI;
+            float r = u01(rng) * cam.lens_radius;
+            glm::vec3 offset = r * (cos(angle) * cam.right + sin(angle) * cam.up);
+
+            segment.ray.origin = cam.position + offset;
+            segment.ray.direction = glm::normalize(cam.focal_dis / glm::dot(segment.ray.direction, cam.view) * segment.ray.direction - offset);
+        }
 
         segment.pixelIndex = index;
         segment.remainingBounces = traceDepth;
