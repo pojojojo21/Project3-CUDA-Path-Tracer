@@ -7,8 +7,6 @@ CUDA Path Tracer
   * [LinkedIn](https://www.linkedin.com/in/joanna-fisch-bb2979186/), [Website](https://sites.google.com/view/joannafischsportfolio/home)
 * Tested on: Windows 11, i7-12700H @ 2.30GHz 16GB, NVIDIA GeForce RTX 3060 (Laptop)
 
-### (TODO: Your README)
-
 ### Feature: BSDF Evaluation
 Overview:
 The Bidirectional Scattering Distribution Function (BSDF) evaluation is central to realistic light transport simulations in a path tracer. This feature computes how light interacts with surfaces, determining the intensity and direction of light after it hits a surface. The BSDF evaluation was implemented to support diffuse, specular, and refractive materials, ensuring physically accurate light behavior.
