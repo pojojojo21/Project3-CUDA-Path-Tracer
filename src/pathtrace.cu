@@ -15,10 +15,13 @@
 #include "utilities.h"
 #include "intersections.h"
 #include "interactions.h"
+#include "OpenImageDenoise/oidn.hpp"
 
 #define ERRORCHECK 1
-#define ANTIALIAS 1
-#define DOF 1
+#define ANTIALIAS 0
+#define DOF 0
+#define DENOISE 1
+#define DENOISE_INTERVAL 50
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -86,6 +89,10 @@ static ShadeableIntersection* dev_intersections = NULL;
 static Vertex* dev_vertices = NULL;
 static Texture* dev_textures = NULL;
 static glm::vec4* dev_pixels = NULL;
+static glm::vec3* dev_output = NULL;
+static glm::vec3* dev_albedo = NULL;
+static glm::vec3* dev_normal = NULL;
+
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 
@@ -124,6 +131,14 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_pixels, scene->texturePixels.size() * sizeof(glm::vec4));
     cudaMemcpy(dev_pixels, scene->texturePixels.data(), scene->texturePixels.size() * sizeof(glm::vec4), cudaMemcpyHostToDevice);
 
+    cudaMalloc(&dev_output, pixelcount * sizeof(glm::vec3));
+    cudaMemset(dev_output, 0, pixelcount * sizeof(glm::vec3));
+
+    cudaMalloc(&dev_albedo, pixelcount * sizeof(glm::vec3));
+    cudaMemset(dev_albedo, 0, pixelcount * sizeof(glm::vec3));
+
+    cudaMalloc(&dev_normal, pixelcount * sizeof(glm::vec3));
+    cudaMemset(dev_normal, 0, pixelcount * sizeof(glm::vec3));
 
     checkCUDAError("pathtraceInit");
 }
@@ -138,6 +153,9 @@ void pathtraceFree()
     cudaFree(dev_vertices);
     cudaFree(dev_textures);
     cudaFree(dev_pixels);
+    cudaFree(dev_output);
+    cudaFree(dev_albedo);
+    cudaFree(dev_normal);
 
     checkCUDAError("pathtraceFree");
 }
@@ -358,7 +376,9 @@ __global__ void shadeFakeMaterial(
     PathSegment* pathSegments,
     Material* materials,
     Texture* textures,
-    glm::vec4* pixels)
+    glm::vec4* pixels,
+    glm::vec3* dev_albedo,
+    glm::vec3* dev_normal)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < num_paths)
@@ -419,13 +439,21 @@ __global__ void shadeFakeMaterial(
                 // Light source
                 pathSegments[idx].color *= (materialColor * material.emittance);
                 pathSegments[idx].remainingBounces = 0;  // Terminate path
+
+#if DENOISE 
+                // calculate the albedo and normal data and store them directly
+                dev_albedo[pathSegments[idx].pixelIndex] = pathSegments[idx].color;
+                dev_normal[pathSegments[idx].pixelIndex] = intersection.surfaceNormal;
+#endif
             }
             // Otherwise, do some pseudo-lighting computation. This is actually more
             // like what you would expect from shading in a rasterizer like OpenGL.
             else {
                 Ray ray = pathSegments[idx].ray;
                 scatterRay(pathSegments[idx], ray.origin + ray.direction * intersection.t, normal, material, rng);
+
             }
+
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
             // used for opacity, in which case they can indicate "no opacity".
@@ -434,6 +462,50 @@ __global__ void shadeFakeMaterial(
         else {
             pathSegments[idx].color = glm::vec3(0.0f);
         }
+    }
+}
+
+__global__ void blendImage(glm::vec3* image, glm::vec3* output, int pixelCount)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < pixelCount) {
+        image[idx] = image[idx] * (1 - 0.5f) + output[idx] * 0.5f;
+    }
+}
+
+void denoiseImage() {
+    const int width = hst_scene->state.camera.resolution.x;
+    const int height = hst_scene->state.camera.resolution.y;
+    // Create an Open Image Denoise device
+    oidn::DeviceRef device = oidn::newDevice();
+    device.commit();
+    // Create a filter for denoising a beauty (color) image using optional auxiliary images too
+    oidn::FilterRef filter = device.newFilter("RT");  // generic ray tracing filter
+    filter.setImage("color", dev_image, oidn::Format::Float3, width, height); // beauty
+    filter.setImage("normal", dev_normal, oidn::Format::Float3, width, height);
+    filter.setImage("albedo", dev_albedo, oidn::Format::Float3, width, height);
+    filter.setImage("output", dev_output, oidn::Format::Float3, width, height);
+    filter.set("hdr", true); // beauty image is HDR
+    filter.set("cleanAux", true); // auxiliary images will be prefiltered
+    filter.commit();
+    // Create separate filters for denoising auxiliary albedo & normal image (in-place)
+    oidn::FilterRef albedoFilter = device.newFilter("RT"); // same filter type as for beauty
+    albedoFilter.setImage("albedo", dev_albedo, oidn::Format::Float3, width, height);
+    albedoFilter.setImage("output", dev_albedo, oidn::Format::Float3, width, height);
+    albedoFilter.commit();
+    oidn::FilterRef normalFilter = device.newFilter("RT");
+    normalFilter.setImage("normal", dev_normal, oidn::Format::Float3, width, height);
+    normalFilter.setImage("output", dev_normal, oidn::Format::Float3, width, height);
+    normalFilter.commit();
+    // Prefilter the auxiliary images
+    albedoFilter.execute();
+    normalFilter.execute();
+    // Filter the beauty image
+    filter.execute();
+    // Check for errors
+    const char* errorMessage;
+    if (device.getError(errorMessage) != oidn::Error::None) {
+        std::cerr << "Error! " << errorMessage << std::endl;
     }
 }
 
@@ -551,13 +623,15 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_paths,
             dev_materials,
             dev_textures,
-            dev_pixels
+            dev_pixels,
+            dev_albedo,
+            dev_normal
         );
 
         PathSegment* new_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, isActive());
         num_paths = new_end - dev_paths;
 
-        if (num_paths == 0) {
+        if (num_paths <= 0) {
             iterationComplete = true;
         }
 
@@ -576,6 +650,11 @@ void pathtrace(uchar4* pbo, int frame, int iter)
     dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
     finalGather<<<numBlocksPixels, blockSize1d>>>(pixelcount, dev_image, dev_paths);
 
+    // Apply denoising
+    if ((iter == hst_scene->state.iterations || iter % DENOISE_INTERVAL == 0) && DENOISE) {
+        denoiseImage();
+        blendImage << <numBlocksPixels, blockSize1d >> > (dev_image, dev_output, pixelcount);
+    }
     ///////////////////////////////////////////////////////////////////////////
 
     // Send results to OpenGL buffer for rendering
