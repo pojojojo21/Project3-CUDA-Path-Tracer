@@ -118,6 +118,10 @@ Potential Optimization:
 Texture Caching: Implementing texture caching or further optimizing texture memory access patterns (using CUDA texture memory) could improve texture sampling performance.
 ![cornell 2024-09-26_20-39-57z 14samp](https://github.com/user-attachments/assets/25c2e981-8254-4eb6-a36a-a6bad2bd78dc)
 
+| Bottle with Texture |  Bottle without Texture  |
+| :------------------------------: |:------------------------------: |
+| <img src="img/texture_bottle.png" width="400"/>                           | <img src="img/bottle.png" width="400"/>                          |
+
 ### Feature: Anti-Aliasing
 Overview:
 Anti-aliasing is a technique used in ray tracing to reduce jagged edges in the rendered image by taking multiple samples per pixel and averaging the results. In my path tracer, I implemented stochastic sampling, where each pixel is sampled multiple times with slight variations in ray directions. This results in a smoother, higher-quality image.
