@@ -116,7 +116,11 @@ On the GPU, texture and bump mapping benefit from high parallelism for texture l
 
 Potential Optimization:
 Texture Caching: Implementing texture caching or further optimizing texture memory access patterns (using CUDA texture memory) could improve texture sampling performance.
-![cornell 2024-09-26_20-39-57z 14samp](https://github.com/user-attachments/assets/25c2e981-8254-4eb6-a36a-a6bad2bd78dc)
+
+| Ninja |  Ninja with Normal Mapping  | Ninja with Normal and Texture Mapping  |
+| :------------------------------: |:------------------------------: |:------------------------------: |
+| <img src="img/ninja.png" width="400"/>                           | <img src="img/ninja_Nor.png" width="400"/>                          | <img src="img/ninja_diffNor.png" width="400"/>                          |
+
 
 | Bottle with Texture |  Bottle without Texture  |
 | :------------------------------: |:------------------------------: |
