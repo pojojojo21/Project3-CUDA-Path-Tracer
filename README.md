@@ -194,7 +194,7 @@ The performance improvement from stream compaction in a closed scene is less pro
 In the open scene, the number of active rays drops significantly after each bounce. The reduction is steep due to rays terminating early.
 In the closed scene, rays bounce multiple times before terminating, leading to a slower reduction in active rays.
 
-![image](https://github.com/user-attachments/assets/f9a355f0-5598-47a4-ac71-8d84b602a080)
+![image](https://github.com/user-attachments/assets/306bc382-bcee-44e3-a7df-7c10d7fdae1c)
 
 #### Interpretation:
 #### Open Scene:
