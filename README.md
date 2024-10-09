@@ -142,8 +142,8 @@ Additionally, applying filtering techniques like temporal anti-aliasing (TAA), w
 
  | Antialiased |  No Antialiasing  |
 | :------------------------------: |:------------------------------: |
-| <img src="img/withAA.png" width="300"/>                           | <img src="img/WITHOUTAA.png" width="300"/>                          |
-|  <img src="img/withAA_ZOOM.png" width="300"/>         |  <img src="img/WITHOUTAA_ZOOM.png" width="300"/>                  |
+| <img src="img/withAA.png" width="300"/>                           | <img src="img/withoutAA.png" width="300"/>                          |
+|  <img src="img/withAA_ZOOM.png" width="300"/>         |  <img src="img/withoutAA_ZOOM.png" width="300"/>                  |
 
 ## Analysis
 
