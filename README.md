@@ -6,6 +6,8 @@ CUDA Path Tracer
 * Joanna Fisch
   * [LinkedIn](https://www.linkedin.com/in/joanna-fisch-bb2979186/), [Website](https://sites.google.com/view/joannafischsportfolio/home)
 * Tested on: Windows 11, i7-12700H @ 2.30GHz 16GB, NVIDIA GeForce RTX 3060 (Laptop)
+* 
+![dragon_obj](https://github.com/user-attachments/assets/3051331a-7130-470a-b8e6-1b004a639e39)
 
 ### Feature: BSDF Evaluation
 Overview:
