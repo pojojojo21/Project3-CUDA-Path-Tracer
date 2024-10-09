@@ -3,7 +3,7 @@
         "light": {
             "TYPE": "Emitting",
             "RGB": [
-                0.8,
+                1.0,
                 1.0,
                 1.0
             ],
@@ -41,18 +41,6 @@
                 0.98
             ],
             "ROUGHNESS": 0.0
-        },
-        "model_text": {
-            "TYPE": "Diffuse",
-            "RGB": [
-                1.0,
-                1.0,
-                1.0
-            ],
-	    "D_PATH": "/Textures/WaterBottle_baseColor.png",
-            "N_PATH": "/Textures/WaterBottle_normal.png"
-            
-
         }
     },
     "Camera": {
@@ -62,16 +50,16 @@
         ],
         "FOVY": 45.0,
         "ITERATIONS": 5000,
-        "DEPTH": 8,
-        "FILE": "refraction",
+        "DEPTH": 9,
+        "FILE": "cornell",
         "EYE": [
             0.0,
-            3.0,
-            5.5
+            5.0,
+            10.5
         ],
         "LOOKAT": [
             0.0,
-            3.0,
+            5.0,
             0.0
         ],
         "UP": [
@@ -87,7 +75,7 @@
             "TRANS": [
                 0.0,
                 10.0,
-                5.0
+                0.0
             ],
             "ROTAT": [
                 0.0,
@@ -95,9 +83,9 @@
                 0.0
             ],
             "SCALE": [
-                10.0,
+                3.0,
                 0.3,
-                10.0
+                3.0
             ]
         },
         {
@@ -119,9 +107,28 @@
                 10.0
             ]
         },
-                {
+        {
             "TYPE": "cube",
-            "MATERIAL": "diffuse_green",
+            "MATERIAL": "diffuse_white",
+            "TRANS": [
+                0.0,
+                10.0,
+                0.0
+            ],
+            "ROTAT": [
+                0.0,
+                0.0,
+                90.0
+            ],
+            "SCALE": [
+                0.01,
+                10.0,
+                10.0
+            ]
+        },
+        {
+            "TYPE": "cube",
+            "MATERIAL": "diffuse_white",
             "TRANS": [
                 0.0,
                 5.0,
@@ -139,13 +146,12 @@
             ]
         },
         {
-            "TYPE": "model",
-            "MATERIAL": "model_text",
-            "PATH": "/Obj/waterbottle.obj",
+            "TYPE": "cube",
+            "MATERIAL": "diffuse_red",
             "TRANS": [
-                0.0,
-                5.5,
-                5.0
+                -5.0,
+                5.0,
+                0.0
             ],
             "ROTAT": [
                 0.0,
@@ -153,9 +159,28 @@
                 0.0
             ],
             "SCALE": [
-                3.0,
-                3.0,
-                3.0
+                0.01,
+                10.0,
+                10.0
+            ]
+        },
+        {
+            "TYPE": "cube",
+            "MATERIAL": "diffuse_green",
+            "TRANS": [
+                5.0,
+                5.0,
+                0.0
+            ],
+            "ROTAT": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "SCALE": [
+                0.01,
+                10.0,
+                10.0
             ]
         }
     ]

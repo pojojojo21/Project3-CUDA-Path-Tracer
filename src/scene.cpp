@@ -34,7 +34,7 @@ void Scene::loadFromJSON(const std::string& jsonName)
     json data = json::parse(f);
     const auto& materialsData = data["Materials"];
     std::unordered_map<std::string, uint32_t> MatNameToID;
-    size_t lastSlashPos = jsonName.find_last_of('/');
+    size_t lastSlashPos = jsonName.find_last_of('/\\');
     std::string basePath = jsonName.substr(0, lastSlashPos);
     for (const auto& item : materialsData.items())
     {

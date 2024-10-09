@@ -94,7 +94,7 @@ struct ShadeableIntersection
 struct isActive {
     __host__ __device__
         bool operator()(const PathSegment& segment) {
-        return segment.remainingBounces != 0;
+        return segment.remainingBounces > 0;
     }
 };
 

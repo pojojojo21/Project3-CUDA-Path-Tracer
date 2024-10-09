@@ -18,7 +18,7 @@
 
 #define ERRORCHECK 1
 #define ANTIALIAS 1
-#define DOF 1
+#define DOF 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -530,6 +530,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         checkCUDAError("trace one bounce");
         cudaDeviceSynchronize();
         depth++;
+        //std::cout << depth << " : " << num_paths << std::endl;
 
         // --- Shading Stage ---
         // Shade path segments based on intersections and generate new rays by
@@ -557,7 +558,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         PathSegment* new_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, isActive());
         num_paths = new_end - dev_paths;
 
-        if (num_paths == 0) {
+        if (num_paths <= 0) {
             iterationComplete = true;
         }
 

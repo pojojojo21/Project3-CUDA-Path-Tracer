@@ -49,8 +49,7 @@
                 1.0,
                 1.0
             ],
-	    "D_PATH": "/Textures/WaterBottle_baseColor.png",
-            "N_PATH": "/Textures/WaterBottle_normal.png"
+            "D_PATH": "/Textures/Spheres_BaseColor.png"
             
 
         }
@@ -66,12 +65,12 @@
         "FILE": "refraction",
         "EYE": [
             0.0,
-            3.0,
-            5.5
+            5.0,
+            10.5
         ],
         "LOOKAT": [
             0.0,
-            3.0,
+            5.0,
             0.0
         ],
         "UP": [
@@ -141,7 +140,7 @@
         {
             "TYPE": "model",
             "MATERIAL": "model_text",
-            "PATH": "/Obj/waterbottle.obj",
+            "PATH": "/Obj/sphere.obj",
             "TRANS": [
                 0.0,
                 5.5,
