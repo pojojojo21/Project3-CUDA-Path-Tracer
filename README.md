@@ -117,3 +117,8 @@ OBJ loading benefits significantly from the parallelism of the GPU. On a CPU, pe
 Potential Optimization:
 Level of Detail (LoD) for OBJ Models: Implementing LoD could improve performance by rendering lower-detail versions of OBJ models at a distance, only switching to higher detail versions as needed based on proximity to the camera.
 ![cornell 2024-09-26_20-39-57z 14samp](https://github.com/user-attachments/assets/e74d2d9b-97ba-409e-b426-417e3248c771)
+
+### Analysis
+
+![image](https://github.com/user-attachments/assets/4e015bc5-c71b-4820-9c14-b8ea9915b3ee)
+
