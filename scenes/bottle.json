@@ -49,10 +49,8 @@
                 1.0,
                 1.0
             ],
-	    "D_PATH": "/Textures/WaterBottle_baseColor.png",
+            "D_PATH": "/Textures/WaterBottle_baseColor.png",
             "N_PATH": "/Textures/WaterBottle_normal.png"
-            
-
         }
     },
     "Camera": {
@@ -119,7 +117,7 @@
                 10.0
             ]
         },
-                {
+        {
             "TYPE": "cube",
             "MATERIAL": "diffuse_green",
             "TRANS": [
@@ -141,7 +139,7 @@
         {
             "TYPE": "model",
             "MATERIAL": "model_text",
-            "PATH": "/Obj/waterbottle.obj",
+            "PATH": "/meshes/waterbottle.obj",
             "TRANS": [
                 0.0,
                 5.5,

@@ -116,7 +116,7 @@
                 10.0
             ]
         },
-                {
+        {
             "TYPE": "cube",
             "MATERIAL": "diffuse_green",
             "TRANS": [
@@ -138,7 +138,7 @@
         {
             "TYPE": "model",
             "MATERIAL": "specular_white",
-            "PATH": "/Obj/sphere.obj",
+            "PATH": "/meshes/sphere.obj",
             "TRANS": [
                 0.0,
                 5.5,

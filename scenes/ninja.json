@@ -196,7 +196,7 @@
         {
             "TYPE": "model",
             "MATERIAL": "model_color",
-            "PATH": "/Obj/ninja.obj",
+            "PATH": "/meshes/ninja.obj",
             "TRANS": [
                 0.0,
                 0.0,
