@@ -138,7 +138,7 @@
         {
             "TYPE": "model",
             "MATERIAL": "specular_white",
-            "PATH": "/meshes/sphere.obj",
+            "PATH": "/meshes/icosphere.obj",
             "TRANS": [
                 0.0,
                 5.5,
